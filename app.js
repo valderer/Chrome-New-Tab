@@ -172,16 +172,10 @@ function createAppElement(app, containerType) {
         // 关键交互：左侧面板鼠标悬停 -> 延迟后刷新右侧面板（非编辑模式下生效，或者即使编辑模式也需要加载子集）
         if (containerType === 'left') {
             appEl.addEventListener('mouseenter', () => {
-                clearTimeout(hoverTimer);
-                hoverTimer = setTimeout(() => {
-                    if (currentHoveredFolderId !== app.id) {
-                        loadRightPanel(app.id, app.title);
-                        updateLeftActiveState(app.id);
-                    }
-                }, 100); // 增加100ms延迟，防止快速滑动时频繁加载
-            });
-            appEl.addEventListener('mouseleave', () => {
-                clearTimeout(hoverTimer); // 如果鼠标快速移出，则不触发加载
+                if (currentHoveredFolderId !== app.id) {
+                    loadRightPanel(app.id, app.title);
+                    updateLeftActiveState(app.id);
+                }
             });
         }
 
@@ -375,16 +369,10 @@ function setupAppIconInteraction(appEl, app, isFolder, containerType) {
 const homeBtnTop = document.getElementById('homeBtnTop');
 if (homeBtnTop) {
     homeBtnTop.addEventListener('mouseenter', () => {
-        clearTimeout(hoverTimer);
-        hoverTimer = setTimeout(() => {
-            if (currentHoveredFolderId !== 'HOME') {
-                loadSearchPane();
-                updateLeftActiveState('HOME');
-            }
-        }, 100);
-    });
-    homeBtnTop.addEventListener('mouseleave', () => {
-        clearTimeout(hoverTimer);
+        if (currentHoveredFolderId !== 'HOME') {
+            loadSearchPane();
+            updateLeftActiveState('HOME');
+        }
     });
 }
 
@@ -392,14 +380,86 @@ if (homeBtnTop) {
 function updateLeftActiveState(activeId) {
     // 覆盖整个左侧面板，包含固定区域和滚动区域
     const allLeftIcons = document.querySelectorAll('.left-panel .app-icon');
+    let targetIcon = null;
     allLeftIcons.forEach(icon => {
         if (icon.dataset.id === activeId) {
-            icon.classList.add('active'); // 叠加一层光晕
+            icon.classList.add('active'); // 逻辑上的 active
+            targetIcon = icon;
         } else {
             icon.classList.remove('active');
         }
     });
+    
+    if (targetIcon) {
+        updateHighlightPosition(targetIcon);
+    }
 }
+
+// 动态创建滑动光标
+let highlightPill = document.getElementById('activeHighlightPill');
+if (!highlightPill) {
+    highlightPill = document.createElement('div');
+    highlightPill.id = 'activeHighlightPill';
+    const leftPanel = document.querySelector('.left-panel');
+    if (leftPanel) leftPanel.appendChild(highlightPill);
+}
+
+function updateHighlightPosition(targetIcon) {
+    if (!highlightPill || !targetIcon) return;
+    const panel = document.querySelector('.left-panel');
+    if (!panel) return;
+    
+    // 如果不在视口内或被 display:none 等隐藏了，宽度高度会为 0
+    const panelRect = panel.getBoundingClientRect();
+    const iconRect = targetIcon.getBoundingClientRect();
+    
+    if (iconRect.width === 0) return;
+    
+    // 计算相对于 panel 的位置
+    // 由于 iconRect 是相对于视口的，panelRect 也是相对于视口的，所以相减就是 relative position 
+    highlightPill.style.transform = `translateY(${Math.max(0, iconRect.top - panelRect.top)}px)`;
+    highlightPill.style.height = `${iconRect.height}px`;
+    highlightPill.style.width = `${iconRect.width}px`;
+    highlightPill.style.left = `${iconRect.left - panelRect.left}px`;
+    highlightPill.style.opacity = '1';
+}
+
+// 当左侧滚动时，实时更新光标位置，使其死死咬住目标
+const leftDesktopNode = document.getElementById('leftDesktop');
+if (leftDesktopNode) {
+    let scrollTimeout;
+    leftDesktopNode.addEventListener('scroll', () => {
+        // 滚动时关闭过渡动画以防延迟拖尾
+        if (highlightPill) {
+            highlightPill.style.transition = 'none';
+        }
+        
+        const activeIcon = document.querySelector('.left-panel .app-icon.active');
+        if (activeIcon) {
+            updateHighlightPosition(activeIcon);
+        }
+        
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(() => {
+            if (highlightPill) {
+                highlightPill.style.transition = 'transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), height 0.25s, width 0.25s, opacity 0.2s';
+            }
+        }, 100);
+    });
+}
+
+// 窗口尺寸改变时也要重算高亮罩位置
+window.addEventListener('resize', () => {
+    const activeIcon = document.querySelector('.left-panel .app-icon.active');
+    if (activeIcon) {
+        if (highlightPill) highlightPill.style.transition = 'none';
+        updateHighlightPosition(activeIcon);
+        setTimeout(() => {
+            if (highlightPill) highlightPill.style.transition = '';
+        }, 50);
+    }
+});
+
 
 // 初始化/刷新整体视图
 function loadAll() {
@@ -552,7 +612,7 @@ function renderQuickAccess(items, folderId) {
     items.forEach((app) => {
         // 使用 'right' 作为 containerType，因为我们要右侧面板同样的行为（点击能打开/内入）
         const appEl = createAppElement(app, 'right');
-        appEl.style.animationDelay = `${Math.min(delayCounter * 12, 150)}ms`;
+        appEl.style.animationDelay = `${Math.min(delayCounter * 18, 150)}ms`;
         quickAccessDesktop.appendChild(appEl);
         delayCounter++;
     });
@@ -560,7 +620,7 @@ function renderQuickAccess(items, folderId) {
     // 为首页增加一个快速添加按钮
     const addBtn = document.createElement('div');
     addBtn.className = 'app-icon add-action';
-    addBtn.style.animationDelay = `${Math.min(delayCounter * 12, 150)}ms`;
+    addBtn.style.animationDelay = `${Math.min(delayCounter * 18, 150)}ms`;
     // 为了能够在该文件夹中添加，临时借用一个变量或直接触发回调
     addBtn.innerHTML = `
         <div class="icon-img">
@@ -592,7 +652,7 @@ function renderRightPanel(items, folderId, currentFolder) {
     if (currentFolder && currentFolder.parentId && currentFolder.parentId !== rootFolderId && currentFolder.parentId !== "0") {
         const backBtn = document.createElement('div');
         backBtn.className = 'app-icon back-action';
-        backBtn.style.animationDelay = `${Math.min(delayCounter * 12, 150)}ms`;
+        backBtn.style.animationDelay = `${Math.min(delayCounter * 18, 150)}ms`;
         backBtn.innerHTML = `
             <div class="icon-img">
                 <svg viewBox="0 0 24 24" fill="var(--btn-primary, #3478F6)" style="width:100%;height:100%; transition: fill 0.8s ease;">
@@ -619,7 +679,7 @@ function renderRightPanel(items, folderId, currentFolder) {
     items.forEach((app) => {
         const appEl = createAppElement(app, 'right');
         // 为每一个小碎片加上交错延迟 (最多延迟不超150ms，保持敏捷感)
-        appEl.style.animationDelay = `${Math.min(delayCounter * 12, 150)}ms`;
+        appEl.style.animationDelay = `${Math.min(delayCounter * 18, 240)}ms`;
         rightDesktop.appendChild(appEl);
         delayCounter++;
     });
@@ -627,7 +687,7 @@ function renderRightPanel(items, folderId, currentFolder) {
     // 右侧的添加按钮：用于往当前查阅的文件夹里增加书签
     const addBtn = document.createElement('div');
     addBtn.className = 'app-icon add-action';
-    addBtn.style.animationDelay = `${Math.min(delayCounter * 12, 150)}ms`;
+    addBtn.style.animationDelay = `${Math.min(delayCounter * 18, 150)}ms`;
     addBtn.innerHTML = `
         <div class="icon-img">
             <svg viewBox="0 0 24 24" fill="currentColor" style="width:100%;height:100%;"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>

@@ -135,6 +135,8 @@ body {
     border-right: 0.5px solid var(--panel-border);
     padding: 0px 0px 10px 10px;
     transition: background 0.5s ease;
+    position: relative;
+    overflow: hidden; /* 防止高亮块溢出 */
 }
 
 .right-panel {
@@ -194,6 +196,7 @@ body {
 }
 
 .app-icon:hover { background-color: var(--hover-bg); }
+.left-panel .app-icon:hover { background-color: transparent; } /* 左侧采用平滑光标代替自带hover */
 .icon-img { display: flex; justify-content: center; align-items: center; flex-shrink: 0; border-radius: 4px; }
 .icon-img img { width: 100%; height: 100%; object-fit: contain; }
 
@@ -206,9 +209,22 @@ body {
 
 /* 左侧层 (包含固定区域和滚动区域) */
 #leftDesktop { gap: 2px; }
-.left-panel .app-icon { padding: 6px 10px; }
-.left-panel .app-icon.active { background-color: var(--active-bg); }
+.left-panel .app-icon { padding: 6px 10px; z-index: 1; }
+/* .left-panel .app-icon.active { background-color: var(--active-bg); } (由滑动高亮罩代替) */
 .left-panel .icon-img { width: 18px; height: 18px; }
+
+/* 侧边栏滑动高亮块 */
+#activeHighlightPill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 8px;
+    background-color: var(--active-bg);
+    transition: transform 0.25s cubic-bezier(0.25, 1, 0.5, 1), height 0.25s, width 0.25s, opacity 0.2s;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0;
+}
 .left-panel .app-title { font-weight: 500; }
 
 .fixed-nav {
@@ -261,8 +277,10 @@ body {
 }
 
 /* 添加按钮与首页按钮适应主题 */
-.add-action .icon-img svg, .home-action .icon-img svg { color: var(--btn-primary); }
-.add-action .app-title, .home-action .app-title { color: var(--btn-primary) !important; font-weight: 500; }
+/* .add-action .icon-img svg, .home-action .icon-img svg { color: var(--btn-primary); } */
+.add-action .app-title { color: var(--btn-primary) !important; font-weight: 500; }
+
+/* .add-action .app-title, .home-action .app-title { color: var(--btn-primary) !important; font-weight: 500; } */
 
 /* ================== 搜索模块 ================== */
 .search-container {
